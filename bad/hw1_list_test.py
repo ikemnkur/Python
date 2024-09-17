@@ -76,6 +76,8 @@ adj_list = {
     'S': ['C:3', 'D:2']
 }
 
+
+
 # Generate adjacency matrix
 nodes, matrix = create_adjacency_matrix(adj_list)
 

@@ -24,10 +24,12 @@
 
 import csv
 from collections import defaultdict, deque
-
+import heapq
 
 # CSV content as a string
-csv_content = """
+
+# Adjacency matrix
+adjacency_matrix = """
 ,A,B,C,D,E,F,G,H,I,J,K,L,M,N,P,Q,S
 A,0,4,-1,-1,1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1
 B,4,0,2,-1,-1,2,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1
@@ -48,33 +50,122 @@ Q,-1,-1,-1,-1,-1,-1,10,-1,-1,-1,-1,10,-1,-1,-1,0,-1
 S,-1,-1,3,2,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,0
 """
 
-# def create_graph_from_csv(file_content):
-#     graph = defaultdict(dict)
-#     reader = csv.reader(file_content.strip().split('\n'))
-#     nodes = next(reader)[1:]  # Skip the first empty cell
-#     for i, row in enumerate(reader):
-#         for j, weight in enumerate(row[1:]):  # Skip the first cell (node name)
-#             if weight != '-1':
-#                 graph[row[0]][nodes[j]] = int(weight)
-#     return graph
 
+# Given adjacency list
+adjacency_list = {
+    'A': ['B:4', 'E:1'],
+    'B': ['A:4', 'C:2', 'F:2'],
+    'C': ['B:2', 'H:4', 'S:3'],
+    'D': ['L:8', 'S:2'],
+    'E': ['A:1', 'F:3', 'I:6'],
+    'F': ['B:2', 'E:3', 'J:6', 'K:4'],
+    'G': ['M:4', 'N:4', 'Q:10'],
+    'H': ['C:4', 'K:3', 'L:7'],
+    'I': ['E:6', 'J:1', 'M:5'],
+    'J': ['F:6', 'I:1', 'K:3', 'N:3'],
+    'K': ['F:4', 'H:3', 'J:3', 'L:9', 'P:3'],
+    'L': ['D:8', 'H:7', 'K:9', 'Q:10'],
+    'M': ['G:4', 'I:5'],
+    'N': ['G:4', 'J:3', 'P:2'],
+    'P': ['K:3', 'N:2'], 
+    'Q': ['G:10', 'L:10'],
+    'S': ['C:3', 'D:2']
+}
+
+# Given heuristic function
+H_n = {
+    "S": 17, "A": 10, "B": 9, "C": 16, "D": 21, "E": 13, "F": 9, "G": 0,
+    "H": 12, "I": 9, "J": 5, "K": 8, "L": 18, "M": 3, "N": 4, "K": 6, "Q": 9
+}
+
+# # Given adjacency list
+# astar_adjacency_list = {
+#     'H': ['c:4', 'E:3', 'F:2'],
+#     'C': ['A:2', 'D:3', 'E:3'],
+#     'D': ['C:3', 'A:2', 'K:2'],
+#     'K': ['G:12', 'D:2', 'J:2'],
+#     'E': ['A:5', 'F:6', 'H:3', 'C:3'],
+#     'F': ['H:2', 'E:6', 'B:5', 'G:7'],
+#     'G': ['J:4', 'B:3', 'A:10', 'J:4', 'K:12' ],
+#     'J': ['G:4', 'K:2', 'B:4'],
+#     'A': ['C:2', 'D:4', 'E:5', 'G:10'],
+#     'N': ['F:5', 'G:3', 'J:4'],
+# }
+
+# The heuristic function
+def heuristic(node):
+    return H_n.get(node, float('inf'))
+
+# Creates graphs from the csv, which is then use to create a adjacency list (not used, old)
 def create_graph_from_csv(file_content):
     graph = defaultdict(dict)
     reader = csv.reader(file_content.strip().split('\n'))
-    
-    # Get node names from the first row, skipping the first empty cell
-    nodes = next(reader)[1:]
-    
+    nodes = next(reader)[1:]  # Skip the first empty cell
     for i, row in enumerate(reader):
-        node = row[0]  # Current node is the first column of each row
-        for j, weight in enumerate(row[1:]):
-            if weight != '-1':
-                graph[node][nodes[j]] = int(weight)
-    
+        for j, weight in enumerate(row[1:]):  # Skip the first cell (node name)
+            if weight != '-1' and weight != '0':
+                graph[row[0]][nodes[j]] = int(weight)
     return graph
 
+# Creates adjacency list from the Matrix CSV
+def create_adjacency_list_from_matrix(adjacency_matrix):
+    adjacency_list = defaultdict(list)
+    lines = adjacency_matrix.strip().split('\n')
+    nodes = lines[0].split(',')[1:]  # Get node names, skip the first empty cell
+    
+    for i, line in enumerate(lines[1:], start=0):
+        values = line.split(',')
+        node = values[0]
+        for j, weight in enumerate(values[1:], start=0):
+            if weight != '-1' and weight != '0':
+                adjacency_list[node].append(nodes[j])
+    
+    return adjacency_list
+
+# Creates adjacency list from the Matrix but considers the Wieghts when appending to the list
+def create_adjacency_list_from_matrix_gbfs(adjacency_matrix):
+    adjacency_list = defaultdict(list)
+    lines = adjacency_matrix.strip().split('\n')
+    nodes = lines[0].split(',')[1:]  # Get node names, skip the first empty cell
+    
+    for i, line in enumerate(lines[1:], start=0):
+        values = line.split(',')
+        node = values[0]
+        for j, weight in enumerate(values[1:], start=0):
+            if weight != '-1' and weight != '0':
+                adjacency_list[node].append(f"{nodes[j]}:{weight}")
+    
+    return adjacency_list
+
+# Creates an Adjaceny Matrix for comparing the inputs
+def create_adjacency_matrix(adjacency_list):
+    nodes = sorted(adjacency_list.keys())
+    n = len(nodes)
+    matrix = [[-1] * n for _ in range(n)]
+    
+    for i, node in enumerate(nodes):
+        matrix[i][i] = 0  # Set diagonal to 0
+        for neighbor in adjacency_list[node]:
+            neighbor, weight = neighbor.split(':')
+            j = nodes.index(neighbor)
+            matrix[i][j] = int(weight)
+    
+    return nodes, matrix
+
+# Convert Matrix Object in to String to print to console
+def matrix_to_string(nodes, matrix):
+    header = ',' + ','.join(nodes)
+    rows = [header]
+    for i, row in enumerate(matrix):
+        row_str = f"{nodes[i]}," + ','.join(map(str, row))
+        rows.append(row_str)
+    return '\n'.join(rows)
+
+
+
+# Implement this Breath First Search function 
 def BFS(start: str) -> list:
-    graph = create_graph_from_csv(csv_content)
+    graph = create_adjacency_list_from_matrix(adjacency_matrix)
     queue = deque([start])
     visited = set([start])
     expanded = []
@@ -83,53 +174,163 @@ def BFS(start: str) -> list:
         node = queue.popleft()
         expanded.append(node)
 
-        # Get all neighbors
-        all_neighbors = list(graph[node].keys())
-        
-        # Sort neighbors alphabetically
-        all_neighbors.sort()
+        if node == 'G':
+            break  
 
-        for neighbor in all_neighbors:
+        # Get all neighbors and sort them alphabetically
+        neighbors = sorted(graph[node])
+
+        for neighbor in neighbors:
             if neighbor not in visited:
                 visited.add(neighbor)
                 queue.append(neighbor)
+            if neighbor == 'G':
+                print("Node: ", node, " has nieghbor node G")
+                expanded.append(neighbor)
+                return expanded
 
     return expanded
 
-
-# def BFS(start: str) -> list:
-#     graph = create_graph_from_csv(csv_content)
-#     queue = deque([start])
-#     visited = set([start])
-#     expanded = []
-
-#     while queue:
-#         node = queue.popleft()
-#         expanded.append(node)
-
-#         neighbors = sorted(graph[node].keys())
-#         for neighbor in neighbors:
-#             if neighbor not in visited:
-#                 visited.add(neighbor)
-#                 queue.append(neighbor)
-
-#     return expanded
-
+# Implement this Depth First Search function 
 def DFS(start: str) -> list:
-    # START: Your code here
-    return []
-    # END: Your code here
+    graph = create_adjacency_list_from_matrix(adjacency_matrix)
+    visited = set()
+    expanded = []
+    goal_reached = False
 
+    def dfs_recursive(node):
+        nonlocal goal_reached
+        if node not in visited and not goal_reached:
+            visited.add(node)
+            expanded.append(node)
+            
+            if node == 'G':
+                goal_reached = True
+                return
 
+            # Sort neighbors alphabetically
+            neighbors = sorted(graph[node])
+            for neighbor in neighbors:
+                if neighbor not in visited and not goal_reached:
+                    dfs_recursive(neighbor)
+
+    dfs_recursive(start)
+    return expanded
+
+# Implement this Greedy Best First Search function 
 def GBFS(start: str) -> list:
-    # START: Your code here
-    return []
-    # END: Your code here
+    graph = create_adjacency_list_from_matrix(adjacency_matrix)
+    visited = set()
+    expanded = []
+    pq = [(heuristic(start), start)]
+
+    while pq:
+        unused, node = heapq.heappop(pq)
+        if node not in visited:
+            visited.add(node)
+            expanded.append(node)
+
+            if node == 'G':
+                break
+
+            neighbors = [n.split(':')[0] for n in graph[node]]
+            for neighbor in neighbors:
+                if neighbor not in visited:
+                    heapq.heappush(pq, (heuristic(neighbor), neighbor))
+
+    return expanded
+
+#Print BFS Test cases
+print("BFS('A'):", BFS('A'))
+print("BFS('S'):", BFS('S'))
+
+# Print DFS Test cases
+print("DFS('A'):", DFS('A'))
+print("DFS('S'):", DFS('S'))
+ 
+# Print GBFS Test cases 
+print("GBFS('A'):", GBFS('A'))
+print("GBFS('S'):", GBFS('S'))
 
 
-# Test cases
-print(BFS('A'))
-print(BFS('S'))
+
+
+# Generate adjacency list
+adj_list = create_adjacency_list_from_matrix(adjacency_matrix)
+
+# Modified function to print adjacency list with weights
+def print_adjacency_list(adj_list):
+    print("\nGenerated Adjacency List:")
+    for node, neighbors in adj_list.items():
+        neighbor_strings = [f"{neighbor.split(':')[0]}:{neighbor.split(':')[1]}" for neighbor in neighbors]
+        print(f"{node}: {neighbor_strings}")
+
+# Old Function to print adjacency list (no wieghts)
+def print_gen_adjacency_list(adj_list):
+    print("\nGenerated Adjacency List:")
+    for node, neighbors in adj_list.items():
+        print(f"{node}: {neighbors}")
+
+# Function to check if 2 matrices are equal
+def check_adjacency_matrices(matrix1, matrix2):
+    if isinstance(matrix1, str) and isinstance(matrix2, str):
+        matrix1 = matrix1.strip().split('\n')
+        matrix2 = matrix2.strip().split('\n')
+    
+    if len(matrix1) != len(matrix2):
+        return False
+    
+    for row1, row2 in zip(matrix1, matrix2):
+        if row1 != row2:
+            return False
+    
+    return True
+
+# Function to check if 2 adjacency lists are equal
+def check_adjacency_lists(list1, list2):
+    if len(list1) != len(list2):
+        return False
+    
+    for node in list1:
+        if node not in list2:
+            return False
+        if set(list1[node]) != set(list2[node]):
+            return False
+    
+    return True
+
+
+# Generate adjacency matrix
+nodes, matrix = create_adjacency_matrix(adjacency_list)
+
+# Convert matrix to CSV string
+adj_matrix = matrix_to_string(nodes, matrix)
+
+# print Matrix CSV
+print("Generated Adjacency Matrix:")
+print(adj_matrix)
+
+# Generate adjacency list
+adj_list = create_adjacency_list_from_matrix(adjacency_matrix)
+
+# Print the old adjacency list with weights
+print_adjacency_list(adjacency_list)
+
+# Print the new adjacency list with weights
+print_gen_adjacency_list(adj_list)
+
+# Print the new adjacency list with weights with the python print function
+print("\nRaw Adjacency List:")
+print(dict(adj_list))
+
+print("\n") # for spacing
+
+# Check if adjacency matrices are equal
+print("Adj. matrices are equal:", check_adjacency_matrices(adjacency_matrix, adj_matrix))
+
+# Check if adjacency lists are equal - not working but they are the same, I check manually
+print("Adj. lists are equal:", check_adjacency_lists(adjacency_list, adj_list))
+
 
 
 # test cases - DO NOT MODIFY THESE
@@ -140,19 +341,17 @@ def run_tests():
     # Test case 2: BFS starting from node 'S'
     assert BFS('S') == ['S', 'C', 'D', 'B', 'H', 'L', 'A', 'F', 'K', 'Q', 'G'], "Test case 2 failed"
 
-    # # Test case 3: DFS starting from node 'A'
-    # assert DFS('A') == ['A', 'B', 'C', 'H', 'K', 'F', 'E', 'I', 'J', 'N', 'G'], "Test case 3 failed"
+    # Test case 3: DFS starting from node 'A'
+    assert DFS('A') == ['A', 'B', 'C', 'H', 'K', 'F', 'E', 'I', 'J', 'N', 'G'], "Test case 3 failed"
     
-    # # Test case 4: DFS starting from node 'S'
-    # assert DFS('S') == ['S', 'C', 'B', 'A', 'E', 'F', 'J', 'I', 'M', 'G'], "Test case 4 failed"
+    # Test case 4: DFS starting from node 'S'
+    assert DFS('S') == ['S', 'C', 'B', 'A', 'E', 'F', 'J', 'I', 'M', 'G'], "Test case 4 failed"
 
-    # # Test case 5: GBFS starting from node 'A'
-    # assert GBFS('A') == ['A', 'B', 'F', 'J', 'N', 'G'], "Test case 5 failed"
+    # Test case 5: GBFS starting from node 'A'
+    assert GBFS('A') == ['A', 'B', 'F', 'J', 'N', 'G'], "Test case 5 failed"
     
-    # # Test case 6: GBFS starting from node 'S'
-    # assert GBFS('S') == ['S', 'C', 'B', 'F', 'J', 'N', 'G'], "Test case 6 failed"
-
-    
+    # Test case 6: GBFS starting from node 'S'
+    assert GBFS('S') == ['S', 'C', 'B', 'F', 'J', 'N', 'G'], "Test case 6 failed"
     
     print("All test cases passed!")
 

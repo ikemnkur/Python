@@ -93,9 +93,32 @@ def matrix_to_string(nodes, matrix):
     return '\n'.join(rows)
 
 
-# Ignore this, this Depth First Search function will be implemented later
-# def DFS(start: str) -> list:
-    # return expanded
+# Implement this Depth First Search function 
+def DFS(start: str) -> list:
+    graph = create_adjacency_list_from_matrix(adjacency_matrix)
+    visited = set()
+    expanded = []
+    goal_reached = False
+
+    def dfs_recursive(node):
+        nonlocal goal_reached
+        if node not in visited and not goal_reached:
+            visited.add(node)
+            expanded.append(node)
+            
+            if node == 'G':
+                goal_reached = True
+                return
+
+            # Sort neighbors alphabetically
+            neighbors = sorted(graph[node])
+            for neighbor in neighbors:
+                if neighbor not in visited and not goal_reached:
+                    dfs_recursive(neighbor)
+
+    dfs_recursive(start)
+    return expanded
+
 
 # Test cases
 def run_tests():
@@ -107,7 +130,7 @@ def run_tests():
     
     # Test case 4: DFS starting from node 'S'
     result_s = DFS('S')
-    print("DFS('S'):", result_S)
+    print("DFS('S'):", result_s)
     assert DFS('S') == ['S', 'C', 'B', 'A', 'E', 'F', 'J', 'I', 'M', 'G'], "Test case 4 failed"
 
 
@@ -178,7 +201,5 @@ print("Adj. matrices are equal:", check_adjacency_matrices(adjacency_matrix, adj
 # Check if adjacency lists are equal
 print("Adj. lists are equal:", check_adjacency_lists(adjacency_list, adj_list))
 
-
-# Ignore all below this part of the code
-# if __name__ == '__main__':
-    # run_tests()
+if __name__ == '__main__':
+    run_tests()

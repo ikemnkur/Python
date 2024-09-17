@@ -41,7 +41,8 @@ def BFS(start: str) -> list:
     while queue:
         node = queue.popleft()
         expanded.append(node)
-
+        if node == 'G':
+            break  
         neighbors = sorted(graph[node].keys())
         for neighbor in neighbors:
             if neighbor not in visited and neighbor not in queue:
